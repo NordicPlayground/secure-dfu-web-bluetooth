@@ -1,0 +1,40 @@
+{
+  "name": "secure-dfu",
+  "version": "0.0.0",
+  "description": "Library for performing secure device firmware updates over-the-air via Web Bluetooth.",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha --reporter spec"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mjdietzx/Web-Bluetooth-Secure-DFU.git"
+  },
+  "keywords": [
+    "Nordic",
+    "Semiconductor",
+    "BLE",
+    "Bluetooth",
+    "Web",
+    "Bluetooth",
+    "DFU",
+    "Secure",
+    "OTA",
+    "nRF51",
+    "nRF52",
+    "nRF5",
+    "ARM",
+    "mbed",
+    "Espruino"
+  ],
+  "author": "Michael Dietz <mjdietz2@illinois.edu>",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/mjdietzx/Web-Bluetooth-Secure-DFU/issues"
+  },
+  "homepage": "https://github.com/mjdietzx/Web-Bluetooth-Secure-DFU#readme",
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "mocha": "^3.1.2"
+  }
+}
