@@ -5,6 +5,7 @@ const expect = require('chai').expect;
 
 const unZip = require('../index').unZip;
 const parseManifest = require('../index').parseManifest;
+const scanForSecureDFUDevice = require('../index').scanForSecureDFUDevice;
 
 
 describe('#unZip', () => {
@@ -22,5 +23,12 @@ describe('#unZip', () => {
     });
 
     expect(errCode).to.equal(0);
+  });
+
+  it('should scan for and find a BLE device advertising the secure DFU service. NOTE: requires nRF52 device running secure_dfu_secure_dfu_ble_s132_pca10040_debug.hex in range.', (done) => {
+    scanForSecureDFUDevice((device) => {
+      expect(device.name).to.equal('DfuTarg');
+      done();
+    });
   });
 });

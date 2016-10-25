@@ -1,11 +1,11 @@
 const fs = require('fs');
 
 const AdmZip = require('adm-zip');
-
+const bleat = require('bleat').webbluetooth;
 
 // https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v12.0.0/lib_dfu_transport_ble.html?cp=4_0_0_3_4_3_2
-const NORDIC_SEMI_BASE_UUID = '8EC90001-xxxx-4F60-9FB8-838830DAEA50';
-const SECURE_DFU_SERVICE_UUID = NORDIC_SEMI_BASE_UUID.replace('xxxx', 'FE59');
+const NORDIC_SEMI_BASE_UUID = '0000xxxx-0000-1000-8000-00805f9b34fb';
+const SECURE_DFU_SERVICE_UUID = NORDIC_SEMI_BASE_UUID.replace('xxxx', 'fe59');
 const DFU_CONTROL_POINT_UUID = NORDIC_SEMI_BASE_UUID.replace('xxxx', '0001');
 const DFU_PACKET_UUID = NORDIC_SEMI_BASE_UUID.replace('xxxx', '0002');
 
@@ -49,5 +49,21 @@ function parseManifest(manifestFilePath, callback) {
 }
 
 
+function scanForSecureDFUDevice(callback) {
+  bleat.requestDevice({
+    filters: [{ services: [SECURE_DFU_SERVICE_UUID] }],
+    deviceFound: (bluetoothDevice) => {
+      callback(bluetoothDevice);
+    },
+  });
+}
+
+
+scanForSecureDFUDevice((device) => {
+  console.log(device);
+});
+
+
 exports.unZip = unZip;
 exports.parseManifest = parseManifest;
+exports.scanForSecureDFUDevice = scanForSecureDFUDevice;
