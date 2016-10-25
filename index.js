@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+
 const AdmZip = require('adm-zip');
 
 
@@ -23,4 +25,17 @@ function unZip(zip_file_path) {
 };
 
 
+function parseManifest(manifest_file_path, callback) {
+	fs.readFile(manifest_file_path, (err, data) => {
+		if (err) {
+			throw err;
+		}
+		callback(JSON.parse(data));
+	});
+
+	return 0;
+}
+
+
 exports.unZip = unZip;
+exports.parseManifest = parseManifest;
