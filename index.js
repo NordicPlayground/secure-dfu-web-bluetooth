@@ -143,9 +143,39 @@ function parseResponse(response) {
 }
 
 
-// Transfer of an init packet:
+// Scary stuff...
+function sendData(characteristic, index, buffer) {
+  return new Promise((resolve, reject) => {
+    if (index < buffer.length) {
+      if (index % 20 === 0) {
+        characteristic.writeValue(buffer.slice(index - 20, index))
+        .then(() => {
+          index += 1;
+          sendData(characteristic, index, buffer);
+          resolve(); // TODO: Understand this unwrapping.
+        })
+        .catch((error) => {
+          reject(error);
+        });
+      } else {
+        index += 1;
+        sendData(characteristic, index, buffer);
+      }
+    } else {
+      const leftOver = index % 20;
+      if (leftOver > 0) {
+        characteristic.writeValue(buffer.slice(index - leftOver, index))
+        .then(() => {
+          resolve();
+        })
+        .catch((error) => {
+          reject(error);
+        });
+      }
+    }
+  });
+}
 
-/* DFU controller -> Control Point: Select command. */
 
 // Export global variables for testing.
 exports.SECURE_DFU_SERVICE_UUID = SECURE_DFU_SERVICE_UUID;
@@ -158,3 +188,4 @@ exports.CONTROL_OPCODES = CONTROL_OPCODES;
 exports.deviceDiscover = deviceDiscover;
 exports.enableNotifications = enableNotifications;
 exports.parseResponse = parseResponse;
+exports.sendData = sendData;
