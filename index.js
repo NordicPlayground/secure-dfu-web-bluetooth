@@ -11,7 +11,7 @@ const BASE_CHARACTERISTIC_UUID = '8ec9xxxx-f315-4f60-9fb8-838830daea50';
 const DFU_CONTROL_POINT_UUID = BASE_CHARACTERISTIC_UUID.replace('xxxx', '0001');
 const DFU_PACKET_UUID = BASE_CHARACTERISTIC_UUID.replace('xxxx', '0002');
 
-/* Control point procedure opcodes. */
+// Control point procedure opcodes.
 const CONTROL_OPCODES = {
   CREATE: 0x01,
   SET_PRN: 0x02,
@@ -21,14 +21,15 @@ const CONTROL_OPCODES = {
   RESPONSE_CODE: 0x60,
 };
 
-const CREATE_OPCODE_PARAMS = {
-  TYPE: {
-    COMMAND_OBJECT: 0x01,
-    DATA_OBJECT: 0x02,
-  },
-  SIZE: null, // Should be set by caller.
+// Index of response value fields in response packet.
+const BASE_POS = 3;
+const SELECT_RESPONSE_FIELD = {
+  MAXIMUM_SIZE: BASE_POS + 0,
+  OFFSET: BASE_POS + 4,
+  CRC32: BASE_POS + 8,
 };
 
+// Possible result codes sent in the response packet.
 const RESULT_CODES = {
   INVALID_CODE: 0x00,
   SUCCESS: 0x01,
@@ -42,7 +43,7 @@ const RESULT_CODES = {
 };
 
 const reverseLookup = obj => val => {
-  for (let k of Object.keys(obj)) {
+  for (const k of Object.keys(obj)) {
     if (obj[k] === val) {
       return k;
     }
@@ -150,7 +151,9 @@ function enableNotifications(controlPointCharacteristic, eventListener) {
 
 function parseResponse(response) {
   const responseCode = response.getUint8(0);
+  const responseOpCode = response.getUint8(1);
   const resultCode = response.getUint8(2);
+  let responseSpecificData;
 
   if (responseCode !== CONTROL_OPCODES.RESPONSE_CODE) {
     throw new Error(`Unexpected response code received: ${controlOpCodeToString(responseCode)}.`);
@@ -159,16 +162,24 @@ function parseResponse(response) {
     throw new Error(`Error in result code: ${resultCodeToString(resultCode)}.`);
   }
 
+  switch (responseOpCode) {
+    case CONTROL_OPCODES.SELECT:
+      responseSpecificData = {
+        maximumSize: response.getUint32(SELECT_RESPONSE_FIELD.MAXIMUM_SIZE),
+        offset: response.getUint32(SELECT_RESPONSE_FIELD.OFFSET),
+        crc32: response.getUint32(SELECT_RESPONSE_FIELD.CRC32),
+      };
+      break;
+    default:
+      throw new Error(`Unknwon response op-code received: ${controlOpCodeToString(responseOpCode)}.`);
+  }
+
   return {
     responseCode: responseCode,
-    responseOpCode: response.getUint8(1),
+    responseOpCode: responseOpCode,
     resultCode: resultCode,
+    data: responseSpecificData,
   };
-}
-
-
-function controlPointCharNotification(event) {
-  console.log(event.target.value);
 }
 
 
@@ -182,7 +193,6 @@ exports.DFU_CONTROL_POINT_UUID = DFU_CONTROL_POINT_UUID;
 exports.DFU_PACKET_UUID = DFU_PACKET_UUID;
 
 exports.CONTROL_OPCODES = CONTROL_OPCODES;
-exports.CREATE_OPCODE_PARAMS = CREATE_OPCODE_PARAMS;
 
 // Export functions for testing.
 exports.unZip = unZip;
