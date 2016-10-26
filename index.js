@@ -1,13 +1,25 @@
 const fs = require('fs');
 
 const AdmZip = require('adm-zip');
-const bleat = require('bleat').webbluetooth;
+const bluetooth = require('bleat').webbluetooth;
 
 // https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v12.0.0/lib_dfu_transport_ble.html?cp=4_0_0_3_4_3_2
 const NORDIC_SEMI_BASE_UUID = '0000xxxx-0000-1000-8000-00805f9b34fb';
 const SECURE_DFU_SERVICE_UUID = NORDIC_SEMI_BASE_UUID.replace('xxxx', 'fe59');
-const DFU_CONTROL_POINT_UUID = NORDIC_SEMI_BASE_UUID.replace('xxxx', '0001');
-const DFU_PACKET_UUID = NORDIC_SEMI_BASE_UUID.replace('xxxx', '0002');
+
+const BASE_CHARACTERISTIC_UUID = '8ec9xxxx-f315-4f60-9fb8-838830daea50';
+const DFU_CONTROL_POINT_UUID = BASE_CHARACTERISTIC_UUID.replace('xxxx', '0001');
+const DFU_PACKET_UUID = BASE_CHARACTERISTIC_UUID.replace('xxxx', '0002');
+
+/* Control point procedure opcodes. */
+const CONTROL_OPCODES = {
+  CREATE: 0x01,
+  SET_PRN: 0x02,
+  CALCULATE_CHECKSUM: 0x03,
+  EXECUTE: 0x04,
+  SELECT: 0x06,
+  RESPONSE_CODE: 0x60,
+};
 
 
 /**
@@ -38,9 +50,9 @@ function unZip(zipFilePath) {
  * @return {int} Error code, 0 means SUCCESS.
  */
 function parseManifest(manifestFilePath, callback) {
-  fs.readFile(manifestFilePath, (err, data) => {
-    if (err) {
-      throw err;
+  fs.readFile(manifestFilePath, (error, data) => {
+    if (error) {
+      throw error;
     }
     callback(JSON.parse(data));
   });
@@ -49,21 +61,47 @@ function parseManifest(manifestFilePath, callback) {
 }
 
 
-function scanForSecureDFUDevice(callback) {
-  bleat.requestDevice({
-    filters: [{ services: [SECURE_DFU_SERVICE_UUID] }],
-    deviceFound: (bluetoothDevice) => {
-      callback(bluetoothDevice);
-    },
+function deviceDiscover() {
+  let globalDevice;
+  let globalServer;
+  let dfuService;
+  let controlPointCharacteristic;
+  let packetCharacteristic;
+
+  return new Promise((resolve, reject) => {
+    bluetooth.requestDevice({ filters: [{ services: [SECURE_DFU_SERVICE_UUID] }] })
+    .then((device) => {
+      globalDevice = device;
+      return device.gatt.connect();
+    })
+    .then((server) => {
+      globalServer = server;
+      return server.getPrimaryService(SECURE_DFU_SERVICE_UUID);
+    })
+    .then((service) => {
+      dfuService = service;
+      return service.getCharacteristic(DFU_CONTROL_POINT_UUID);
+    })
+    .then((characteristic) => {
+      controlPointCharacteristic = characteristic;
+      return dfuService.getCharacteristic(DFU_PACKET_UUID);
+    })
+    .then((characteristic) => {
+      packetCharacteristic = characteristic;
+      resolve(true);
+    })
+    .catch((error) => {
+      reject(error);
+    });
   });
 }
 
 
-scanForSecureDFUDevice((device) => {
-  console.log(device);
-});
+// Transfer of an init packet:
+
+/* DFU controller -> Control Point: Select command. */
 
 
 exports.unZip = unZip;
 exports.parseManifest = parseManifest;
-exports.scanForSecureDFUDevice = scanForSecureDFUDevice;
+exports.deviceDiscover = deviceDiscover;
