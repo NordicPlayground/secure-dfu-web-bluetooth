@@ -43,20 +43,41 @@ describe('#BLE -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_ble_
     });
   });
 
-  it('should succesfully enable notifications on the control point characteristic.', (done) => {
-    index.enableNotifications(gatt.controlPointCharacteristic, (event) => {
-      const response = event.target.value;
-      const parsedResponse = index.parseResponse(response);
+  // TODO: HACK.
+  let globalDone;
+
+  function notificationHandler(event) {
+    const response = event.target.value;
+    const parsedResponse = index.parseResponse(response);
+
+    if (parsedResponse.responseOpCode === 6) {
       expect(parsedResponse.data.maximumSize).to.equal(65536);
       expect(parsedResponse.data.offset).to.equal(0);
       expect(parsedResponse.data.crc32).to.equal(0);
-      done();
-    })
+    } else if (parsedResponse.responseOpCode === 1) {
+      expect(parsedResponse.data).to.equal(undefined);
+    }
+
+    globalDone();
+  }
+
+  it('should succesfully enable notifications on the control point characteristic.', (done) => {
+    globalDone = done;
+    index.enableNotifications(gatt.controlPointCharacteristic, notificationHandler)
     .then((result) => {
       expect(result).to.equal(true);
       const writeVal = new Uint8Array([0x06, 0x01]);
       return gatt.controlPointCharacteristic.writeValue(writeVal);
     })
+    .catch((error) => {
+      throw error;
+    });
+  });
+
+  it('should send create command.', (done) => {
+    globalDone = done;
+    const writeVal = new Uint8Array([0x01, 0x01, 0x64, 0x0, 0x0, 0x0]);
+    gatt.controlPointCharacteristic.writeValue(writeVal)
     .catch((error) => {
       throw error;
     });

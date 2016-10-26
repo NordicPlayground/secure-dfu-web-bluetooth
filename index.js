@@ -163,6 +163,8 @@ function parseResponse(response) {
   }
 
   switch (responseOpCode) {
+    case CONTROL_OPCODES.CREATE:
+      break;
     case CONTROL_OPCODES.SELECT:
       responseSpecificData = {
         maximumSize: response.getUint32(SELECT_RESPONSE_FIELD.MAXIMUM_SIZE),
