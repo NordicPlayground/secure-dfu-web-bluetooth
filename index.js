@@ -4,8 +4,8 @@ const AdmZip = require('adm-zip');
 const bluetooth = require('bleat').webbluetooth;
 
 // https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v12.0.0/lib_dfu_transport_ble.html?cp=4_0_0_3_4_3_2
-const NORDIC_SEMI_BASE_UUID = '0000xxxx-0000-1000-8000-00805f9b34fb';
-const SECURE_DFU_SERVICE_UUID = NORDIC_SEMI_BASE_UUID.replace('xxxx', 'fe59');
+const BASE_SERVICE_UUID = '0000xxxx-0000-1000-8000-00805f9b34fb';
+const SECURE_DFU_SERVICE_UUID = BASE_SERVICE_UUID.replace('xxxx', 'fe59');
 
 const BASE_CHARACTERISTIC_UUID = '8ec9xxxx-f315-4f60-9fb8-838830daea50';
 const DFU_CONTROL_POINT_UUID = BASE_CHARACTERISTIC_UUID.replace('xxxx', '0001');
@@ -65,8 +65,7 @@ function deviceDiscover() {
   let globalDevice;
   let globalServer;
   let dfuService;
-  let controlPointCharacteristic;
-  let packetCharacteristic;
+  let controlPointChar;
 
   return new Promise((resolve, reject) => {
     bluetooth.requestDevice({ filters: [{ services: [SECURE_DFU_SERVICE_UUID] }] })
@@ -83,11 +82,30 @@ function deviceDiscover() {
       return service.getCharacteristic(DFU_CONTROL_POINT_UUID);
     })
     .then((characteristic) => {
-      controlPointCharacteristic = characteristic;
+      controlPointChar = characteristic;
       return dfuService.getCharacteristic(DFU_PACKET_UUID);
     })
     .then((characteristic) => {
-      packetCharacteristic = characteristic;
+      resolve({
+        device: globalDevice,
+        server: globalServer,
+        service: dfuService,
+        controlPointCharacteristic: controlPointChar,
+        packetCharacteristic: characteristic,
+      });
+    })
+    .catch((error) => {
+      reject(error);
+    });
+  });
+}
+
+
+function enableNotifications(controlPointCharacteristic, eventListener) {
+  return new Promise((resolve, reject) => {
+    controlPointCharacteristic.startNotifications()
+    .then(() => {
+      controlPointCharacteristic.addEventListener('characteristicvaluechanged', eventListener);
       resolve(true);
     })
     .catch((error) => {
@@ -97,11 +115,22 @@ function deviceDiscover() {
 }
 
 
+function controlPointCharNotification(event) {
+  console.log(event.target.value);
+}
+
+
 // Transfer of an init packet:
 
 /* DFU controller -> Control Point: Select command. */
 
+// Export global variables for testing.
+exports.SECURE_DFU_SERVICE_UUID = SECURE_DFU_SERVICE_UUID;
+exports.DFU_CONTROL_POINT_UUID = DFU_CONTROL_POINT_UUID;
+exports.DFU_PACKET_UUID = DFU_PACKET_UUID;
 
+// Export functions for testing.
 exports.unZip = unZip;
 exports.parseManifest = parseManifest;
 exports.deviceDiscover = deviceDiscover;
+exports.enableNotifications = enableNotifications;

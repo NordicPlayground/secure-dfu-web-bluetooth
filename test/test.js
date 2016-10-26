@@ -24,9 +24,29 @@ describe('#unZip', () => {
 });
 
 
-describe('#BLE -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_ble_s132_pca10040_debug.hex in range.', () => {
-  it('should succesfully scan for, connect to, and discover the services/characteristics of device.', (done) => {
+describe('#BLE -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_ble_s132_pca10040_debug.hex in range of computer.', () => {
+  let gatt;
+
+  it('should succesfully scan for, connect to, and discover the services/characteristics of the DFU target device.', (done) => {
     index.deviceDiscover()
+    .then((result) => {
+      expect(result.device.name).to.equal('DfuTarg');
+      expect(result.server.connected).to.equal(true);
+      expect(result.service.uuid).to.equal(index.SECURE_DFU_SERVICE_UUID);
+      expect(result.controlPointCharacteristic.uuid).to.equal(index.DFU_CONTROL_POINT_UUID);
+      expect(result.packetCharacteristic.uuid).to.equal(index.DFU_PACKET_UUID);
+      gatt = result;
+      done();
+    })
+    .catch((error) => {
+      throw error;
+    });
+  });
+
+  it('should succesfully enable notifications on the control point characteristic.', (done) => {
+    index.enableNotifications(gatt.controlPointCharacteristic, (event) => {
+      console.log(event.target.value);
+    })
     .then((result) => {
       expect(result).to.equal(true);
       done();
