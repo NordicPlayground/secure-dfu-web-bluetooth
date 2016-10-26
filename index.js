@@ -21,6 +21,39 @@ const CONTROL_OPCODES = {
   RESPONSE_CODE: 0x60,
 };
 
+const CREATE_OPCODE_PARAMS = {
+  TYPE: {
+    COMMAND_OBJECT: 0x01,
+    DATA_OBJECT: 0x02,
+  },
+  SIZE: null, // Should be set by caller.
+};
+
+const RESULT_CODES = {
+  INVALID_CODE: 0x00,
+  SUCCESS: 0x01,
+  OPCODE_NOT_SUPPORTED: 0x02,
+  INVALID_PARAMETER: 0x03,
+  INSUFFICIENT_RESOURCES: 0x04,
+  INVALID_OBJECT: 0x05,
+  UNSUPPORTED_TYPE: 0x07,
+  OPERATION_NOT_PERMITTED: 0x08,
+  OPERATION_FAILED: 0x0A,
+};
+
+const reverseLookup = obj => val => {
+  for (let k of Object.keys(obj)) {
+    if (obj[k] === val) {
+      return k;
+    }
+  }
+  return 'UNKNOWN';
+};
+
+const controlOpCodeToString = reverseLookup(CONTROL_OPCODES);
+// TODO: need for params?
+const resultCodeToString = reverseLookup(RESULT_CODES);
+
 
 /**
  * Un-zips the compressed file and returns each entry contained in it.
@@ -115,6 +148,25 @@ function enableNotifications(controlPointCharacteristic, eventListener) {
 }
 
 
+function parseResponse(response) {
+  const responseCode = response.getUint8(0);
+  const resultCode = response.getUint8(2);
+
+  if (responseCode !== CONTROL_OPCODES.RESPONSE_CODE) {
+    throw new Error(`Unexpected response code received: ${controlOpCodeToString(responseCode)}.`);
+  }
+  if (resultCode !== RESULT_CODES.SUCCESS) {
+    throw new Error(`Error in result code: ${resultCodeToString(resultCode)}.`);
+  }
+
+  return {
+    responseCode: responseCode,
+    responseOpCode: response.getUint8(1),
+    resultCode: resultCode,
+  };
+}
+
+
 function controlPointCharNotification(event) {
   console.log(event.target.value);
 }
@@ -129,8 +181,12 @@ exports.SECURE_DFU_SERVICE_UUID = SECURE_DFU_SERVICE_UUID;
 exports.DFU_CONTROL_POINT_UUID = DFU_CONTROL_POINT_UUID;
 exports.DFU_PACKET_UUID = DFU_PACKET_UUID;
 
+exports.CONTROL_OPCODES = CONTROL_OPCODES;
+exports.CREATE_OPCODE_PARAMS = CREATE_OPCODE_PARAMS;
+
 // Export functions for testing.
 exports.unZip = unZip;
 exports.parseManifest = parseManifest;
 exports.deviceDiscover = deviceDiscover;
 exports.enableNotifications = enableNotifications;
+exports.parseResponse = parseResponse;

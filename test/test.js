@@ -45,11 +45,19 @@ describe('#BLE -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_ble_
 
   it('should succesfully enable notifications on the control point characteristic.', (done) => {
     index.enableNotifications(gatt.controlPointCharacteristic, (event) => {
-      console.log(event.target.value);
+      const response = event.target.value;
+      const parsedResponse = index.parseResponse(response);
+      console.log(parsedResponse);
+      done();
     })
     .then((result) => {
       expect(result).to.equal(true);
-      done();
+      // Writing 1 is the signal to reset energy expended.
+      const writeVal = new Uint8Array([0x06, 0x01]);
+      return gatt.controlPointCharacteristic.writeValue(writeVal);
+    })
+    .then(() => {
+      console.log('char written.');
     })
     .catch((error) => {
       throw error;
