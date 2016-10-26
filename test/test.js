@@ -6,7 +6,7 @@ const fileUtils = require('../utils/file_utils');
 const index = require('../index');
 
 
-describe('#unZip', () => {
+describe('#file_utils', () => {
   it('should un-zip test_resources/dfu_test_app_hrm_s132.zip and print it\'s contents.', () => {
     const result = fileUtils.unZip(`${__dirname}/test_resources/dfu_test_app_hrm_s132.zip`);
     expect(result.toString()).to.equal(['manifest.json', 'nrf52832_xxaa.bin', 'nrf52832_xxaa.dat'].toString());
@@ -19,13 +19,20 @@ describe('#unZip', () => {
       expect(result.toString()).to.equal({ manifest: { application: { bin_file: 'nrf52832_xxaa.bin', dat_file: 'nrf52832_xxaa.dat' } } }.toString());
       done();
     });
+  });
 
-    expect(errCode).to.equal(0);
+  it('should parse a .bin / .dat file into an array of bytes. Checks that the first and last bytes are correct.', (done) => {
+    const errCode = fileUtils.parseBinaryFile(`${__dirname}/../tmp/nrf52832_xxaa.dat`, (result) => {
+      console.log(typeof(result));
+      expect(result[0]).to.equal(0x12);
+      expect(result.slice(-1)[0]).to.equal(0x11);
+      done();
+    });
   });
 });
 
 
-describe('#BLE -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_ble_s132_pca10040_debug.hex in range of computer.', () => {
+describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_ble_s132_pca10040_debug.hex in range of computer.', () => {
   let gatt;
 
   it('should succesfully scan for, connect to, and discover the services/characteristics of the DFU target device.', (done) => {
