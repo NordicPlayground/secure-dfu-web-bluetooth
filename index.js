@@ -1,5 +1,7 @@
 const bluetooth = require('bleat').webbluetooth;
 
+const fileUtils = require('./utils/file_utils');
+
 // https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v12.0.0/lib_dfu_transport_ble.html?cp=4_0_0_3_4_3_2
 const BASE_SERVICE_UUID = '0000xxxx-0000-1000-8000-00805f9b34fb';
 const SECURE_DFU_SERVICE_UUID = BASE_SERVICE_UUID.replace('xxxx', 'fe59');
@@ -18,6 +20,13 @@ const CONTROL_OPCODES = {
   EXECUTE: 0x04,
   SELECT: 0x06,
   RESPONSE_CODE: 0x60,
+};
+
+const CONTROL_PARAMETERS = {
+  COMMAND_OBJECT: 0x01,
+  DATA_OBJECT: 0x02,
+  // size: Object size in little endian, set by caller.
+  // vale: Number of packets to be sent before receiving a PRN, set by caller. Default == 0.
 };
 
 // Index of response value fields in response packet.
@@ -57,7 +66,6 @@ const reverseLookup = obj => val => {
 };
 
 const controlOpCodeToString = reverseLookup(CONTROL_OPCODES);
-// TODO: need for params?
 const resultCodeToString = reverseLookup(RESULT_CODES);
 
 
@@ -121,6 +129,8 @@ function parseResponse(response) {
   const resultCode = response.getUint8(2);
   let responseSpecificData;
 
+  console.log(response);
+
   if (responseCode !== CONTROL_OPCODES.RESPONSE_CODE) {
     throw new Error(`Unexpected response code received: ${controlOpCodeToString(responseCode)}.`);
   }
@@ -172,6 +182,10 @@ function littleEndian(src) {
 
 
 function sendData(characteristic, buffer) {
+  if (characteristic.uuid !== DFU_PACKET_UUID) {
+    throw new Error('Data must be written to the data point characteristic.');
+  }
+
   return new Promise((resolve, reject) => {
     if (buffer.length <= 0) {
       resolve();
@@ -189,7 +203,81 @@ function sendData(characteristic, buffer) {
 }
 
 
-// Export global variables fonr testing.
+/* Use the functions above to do the DFU. */
+
+let gatt;
+
+
+function controlPointNotificationHandler(event) {
+  const response = event.target.value;
+  const parsedResponse = parseResponse(response);
+  const responseOpCode = parsedResponse.responseOpCode;
+
+  console.log(parsedResponse);
+
+  switch (responseOpCode) {
+    case CONTROL_OPCODES.CREATE:
+      console.log('CREATE');
+      gatt.controlPointCharacteristic.writeValue(
+        new Uint8Array([CONTROL_OPCODES.SET_PRN, 0x00, 0x00]))
+      .catch((error) => {
+        throw error;
+      });
+      break;
+    case CONTROL_OPCODES.SET_PRN:
+      console.log('SET_PRN');
+      fileUtils.parseBinaryFile(`${__dirname}/tmp/nrf52832_xxaa.dat`)
+      .then(result => sendData(gatt.packetCharacteristic, result))
+      .then(() => gatt.controlPointCharacteristic.writeValue(
+          new Uint8Array([CONTROL_OPCODES.CALCULATE_CHECKSUM])))
+      .catch((error) => {
+        throw error;
+      });
+      break;
+    case CONTROL_OPCODES.CALCULATE_CHECKSUM:
+      console.log('CALCULATE_CHECKSUM');
+      gatt.controlPointCharacteristic.writeValue(new Uint8Array([CONTROL_OPCODES.EXECUTE]))
+      .catch((error) => {
+        throw error;
+      });
+      break;
+    case CONTROL_OPCODES.EXECUTE:
+      console.log('EXECUTE');
+      break;
+    case CONTROL_OPCODES.SELECT:
+      console.log('SELECT');
+      // TODO: Some logic to determine if a new object should be created or not.
+      gatt.controlPointCharacteristic.writeValue(
+        new Uint8Array([CONTROL_OPCODES.CREATE,
+                        CONTROL_PARAMETERS.COMMAND_OBJECT,
+                        0x8a, 0x0, 0x0, 0x0]))
+      .catch((error) => {
+        throw error;
+      });
+      break;
+    default:
+      throw new Error(`Unknwon response op-code received: ${controlOpCodeToString(responseOpCode)}.`);
+  }
+}
+
+
+function doDFU() {
+  deviceDiscover()
+  .then((result) => {
+    gatt = result;
+    return enableNotifications(gatt.controlPointCharacteristic, controlPointNotificationHandler);
+  })
+  .then(() => gatt.controlPointCharacteristic.writeValue(
+    new Uint8Array([CONTROL_OPCODES.SELECT, CONTROL_PARAMETERS.COMMAND_OBJECT])))
+  .catch((error) => {
+    throw error;
+  });
+}
+
+
+doDFU();
+
+// Export global variables for testing.
 exports.SECURE_DFU_SERVICE_UUID = SECURE_DFU_SERVICE_UUID;
 exports.DFU_CONTROL_POINT_UUID = DFU_CONTROL_POINT_UUID;
 exports.DFU_PACKET_UUID = DFU_PACKET_UUID;
