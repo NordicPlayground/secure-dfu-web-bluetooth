@@ -155,15 +155,14 @@ function parseResponse(response) {
 }
 
 
-// Scary stuff...
-function sendData(characteristic, index, buffer) {
+function sendData(characteristic, buffer) {
   return new Promise((resolve, reject) => {
-    if (index >= buffer.length) {
+    if (buffer.length <= 0) {
       resolve();
     } else {
-      characteristic.writeValue(buffer.slice(index, index + 20))
+      characteristic.writeValue(buffer.slice(0, 20))
       .then(() => {
-        return sendData(characteristic, index + 20, buffer);
+        return sendData(characteristic, buffer.slice(20));
       })
       .then(() => {
         resolve();

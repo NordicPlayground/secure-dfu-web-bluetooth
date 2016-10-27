@@ -108,7 +108,7 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
     globalDone = done;
     this.timeout(5000); // Note, arrow operator not good with mocha...
     fileUtils.parseBinaryFile(`${__dirname}/../tmp/nrf52832_xxaa.dat`, (result) => {
-      index.sendData(gatt.packetCharacteristic, 0, result)
+      index.sendData(gatt.packetCharacteristic, result)
       .then(() => {
         console.log('sent data');
         const writeVal = new Uint8Array([0x03]);
