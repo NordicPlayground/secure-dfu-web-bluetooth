@@ -15,18 +15,23 @@ describe('#file_utils', () => {
   });
 
   it('should parse the manifest.json file passed to it and return a json object.', (done) => {
-    fileUtils.parseManifest(`${__dirname}/../tmp/manifest.json`, (result) => {
+    fileUtils.parseManifest(`${__dirname}/../tmp/manifest.json`)
+    .then((result) => {
       expect(result.toString()).to.equal({ manifest: { application: { bin_file: 'nrf52832_xxaa.bin', dat_file: 'nrf52832_xxaa.dat' } } }.toString());
       done();
     });
   });
 
   it('should parse a .bin / .dat file into an array of bytes. Checks that the first and last bytes are correct.', (done) => {
-    fileUtils.parseBinaryFile(`${__dirname}/../tmp/nrf52832_xxaa.dat`, (result) => {
+    fileUtils.parseBinaryFile(`${__dirname}/../tmp/nrf52832_xxaa.dat`)
+    .then((result) => {
       expect(result.length).to.equal(138);
       expect(result[0]).to.equal(0x12);
       expect(result.slice(-1)[0]).to.equal(0x11);
       done();
+    })
+    .catch((error) => {
+      throw error;
     });
   });
 });
@@ -76,8 +81,7 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
   it('should succesfully enable notifications on the control point characteristic.', (done) => {
     globalDone = done;
     index.enableNotifications(gatt.controlPointCharacteristic, notificationHandler)
-    .then((result) => {
-      expect(result).to.equal(true);
+    .then(() => {
       const writeVal = new Uint8Array([0x06, 0x01]);
       return gatt.controlPointCharacteristic.writeValue(writeVal);
     })
@@ -104,22 +108,23 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
     });
   });
 
-  it('should send the init packet.', function (done) {
+  it('should send the init packet.', function (done) { // Note, arrow operator not good with mocha...
     globalDone = done;
-    this.timeout(5000); // Note, arrow operator not good with mocha...
-    fileUtils.parseBinaryFile(`${__dirname}/../tmp/nrf52832_xxaa.dat`, (result) => {
-      index.sendData(gatt.packetCharacteristic, result)
-      .then(() => {
-        console.log('sent data');
-        const writeVal = new Uint8Array([0x03]);
-        return gatt.controlPointCharacteristic.writeValue(writeVal);
-      })
-      .then(() => {
-        console.log('send src calc packet');
-      })
-      .catch((error) => {
-        throw error;
-      });
+    this.timeout(5000);
+
+    fileUtils.parseBinaryFile(`${__dirname}/../tmp/nrf52832_xxaa.dat`)
+    .then(result => index.sendData(gatt.packetCharacteristic, result))
+    .then(() => {
+      console.log('sent data');
+      const writeVal = new Uint8Array([3]);
+      return gatt.controlPointCharacteristic.writeValue(writeVal);
+    })
+    .then((_) => {
+      console.log('sent crc calc req');
+      return gatt.controlPointCharacteristic.readValue();
+    })
+    .catch((error) => {
+      throw error;
     });
   });
 });

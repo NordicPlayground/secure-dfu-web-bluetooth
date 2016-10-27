@@ -29,22 +29,26 @@ function unZip(zipFilePath) {
  * @param {string} manifestFilePath : The path to the manifest file to be parsed.
  * @param {function} callback : Callback that will be fired with parsed data after asyn completion.
  */
-function parseManifest(manifestFilePath, callback) {
-  fs.readFile(manifestFilePath, (error, data) => {
-    if (error) {
-      throw error;
-    }
-    callback(JSON.parse(data));
+function parseManifest(manifestFilePath) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(manifestFilePath, (error, data) => {
+      if (error) {
+        reject(error);
+      }
+      resolve(JSON.parse(data));
+    });
   });
 }
 
 
-function parseBinaryFile(filePath, callback) {
-  fs.readFile(filePath, (error, data) => {
-    if (error) {
-      throw error;
-    }
-    callback(data);
+function parseBinaryFile(filePath) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(filePath, (error, data) => {
+      if (error) {
+        reject(error);
+      }
+      resolve(data);
+    });
   });
 }
 

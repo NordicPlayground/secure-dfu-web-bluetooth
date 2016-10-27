@@ -8,6 +8,8 @@ const BASE_CHARACTERISTIC_UUID = '8ec9xxxx-f315-4f60-9fb8-838830daea50';
 const DFU_CONTROL_POINT_UUID = BASE_CHARACTERISTIC_UUID.replace('xxxx', '0001');
 const DFU_PACKET_UUID = BASE_CHARACTERISTIC_UUID.replace('xxxx', '0002');
 
+const BLE_PACKET_SIZE = 20;
+
 // Control point procedure opcodes.
 const CONTROL_OPCODES = {
   CREATE: 0x01,
@@ -104,7 +106,7 @@ function enableNotifications(controlPointCharacteristic, eventListener) {
     controlPointCharacteristic.startNotifications()
     .then(() => {
       controlPointCharacteristic.addEventListener('characteristicvaluechanged', eventListener);
-      resolve(true);
+      resolve();
     })
     .catch((error) => {
       reject(error);
@@ -160,10 +162,8 @@ function sendData(characteristic, buffer) {
     if (buffer.length <= 0) {
       resolve();
     } else {
-      characteristic.writeValue(buffer.slice(0, 20))
-      .then(() => {
-        return sendData(characteristic, buffer.slice(20));
-      })
+      characteristic.writeValue(buffer.slice(0, BLE_PACKET_SIZE))
+      .then(() => sendData(characteristic, buffer.slice(BLE_PACKET_SIZE)))
       .then(() => {
         resolve();
       })
@@ -175,7 +175,7 @@ function sendData(characteristic, buffer) {
 }
 
 
-// Export global variables for testing.
+// Export global variables fonr testing.
 exports.SECURE_DFU_SERVICE_UUID = SECURE_DFU_SERVICE_UUID;
 exports.DFU_CONTROL_POINT_UUID = DFU_CONTROL_POINT_UUID;
 exports.DFU_PACKET_UUID = DFU_PACKET_UUID;
