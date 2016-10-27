@@ -64,6 +64,10 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
       expect(parsedResponse.data.crc32).to.equal(0);
     } else if (parsedResponse.responseOpCode === 1) {
       expect(parsedResponse.data).to.equal(undefined);
+    } else if (parsedResponse.responseOpCode === 3) {
+      console.log(response);
+      console.log(parsedResponse.data);
+      // expect(parsedResponse.data).to.equal(undefined);
     }
 
     globalDone();
@@ -91,13 +95,27 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
     });
   });
 
+  it('should write the calculate crc command before sending init packet.', (done) => {
+    globalDone = done;
+    const writeVal = new Uint8Array([0x03]);
+    gatt.controlPointCharacteristic.writeValue(writeVal)
+    .catch((error) => {
+      throw error;
+    });
+  });
+
   it('should send the init packet.', function (done) {
     globalDone = done;
-    this.timeout(10000); // Note, arrow operator not good with mocha...
+    this.timeout(5000); // Note, arrow operator not good with mocha...
     fileUtils.parseBinaryFile(`${__dirname}/../tmp/nrf52832_xxaa.dat`, (result) => {
-      index.sendData(gatt.controlPointCharacteristic, 0, result)
+      index.sendData(gatt.packetCharacteristic, 0, result)
       .then(() => {
-        done();
+        console.log('sent data');
+        const writeVal = new Uint8Array([0x03]);
+        return gatt.controlPointCharacteristic.writeValue(writeVal);
+      })
+      .then(() => {
+        console.log('send src calc packet');
       })
       .catch((error) => {
         throw error;

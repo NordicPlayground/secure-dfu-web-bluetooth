@@ -20,6 +20,12 @@ const CONTROL_OPCODES = {
 
 // Index of response value fields in response packet.
 const BASE_POS = 3;
+
+const CALCULATE_CHECKSUM_RESPONSE_FIELD = {
+  OFFSET: BASE_POS + 0,
+  CRC32: BASE_POS + 4,
+};
+
 const SELECT_RESPONSE_FIELD = {
   MAXIMUM_SIZE: BASE_POS + 0,
   OFFSET: BASE_POS + 4,
@@ -123,6 +129,12 @@ function parseResponse(response) {
   switch (responseOpCode) {
     case CONTROL_OPCODES.CREATE:
       break;
+    case CONTROL_OPCODES.CALCULATE_CHECKSUM:
+      responseSpecificData = {
+        offset: response.getUint32(CALCULATE_CHECKSUM_RESPONSE_FIELD.OFFSET),
+        crc32: response.getUint32(CALCULATE_CHECKSUM_RESPONSE_FIELD.CRC32),
+      };
+      break;
     case CONTROL_OPCODES.SELECT:
       responseSpecificData = {
         maximumSize: response.getUint32(SELECT_RESPONSE_FIELD.MAXIMUM_SIZE),
@@ -146,32 +158,19 @@ function parseResponse(response) {
 // Scary stuff...
 function sendData(characteristic, index, buffer) {
   return new Promise((resolve, reject) => {
-    if (index < buffer.length) {
-      if (index % 20 === 0) {
-        characteristic.writeValue(buffer.slice(index - 20, index))
-        .then(() => {
-          index += 1;
-          sendData(characteristic, index, buffer);
-          resolve(); // TODO: Understand this unwrapping.
-        })
-        .catch((error) => {
-          reject(error);
-        });
-      } else {
-        index += 1;
-        sendData(characteristic, index, buffer);
-      }
+    if (index >= buffer.length) {
+      resolve();
     } else {
-      const leftOver = index % 20;
-      if (leftOver > 0) {
-        characteristic.writeValue(buffer.slice(index - leftOver, index))
-        .then(() => {
-          resolve();
-        })
-        .catch((error) => {
-          reject(error);
-        });
-      }
+      characteristic.writeValue(buffer.slice(index, index + 20))
+      .then(() => {
+        return sendData(characteristic, index + 20, buffer);
+      })
+      .then(() => {
+        resolve();
+      })
+      .catch((error) => {
+        reject(error);
+      });
     }
   });
 }
