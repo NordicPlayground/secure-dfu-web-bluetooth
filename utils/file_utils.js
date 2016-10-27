@@ -27,7 +27,6 @@ function unZip(zipFilePath) {
  * See: https://github.com/NordicSemiconductor/pc-nrfutil/blob/master/nordicsemi/dfu/package.py#L79
         for a description of the manifest file.
  * @param {string} manifestFilePath : The path to the manifest file to be parsed.
- * @param {function} callback : Callback that will be fired with parsed data after asyn completion.
  */
 function parseManifest(manifestFilePath) {
   return new Promise((resolve, reject) => {

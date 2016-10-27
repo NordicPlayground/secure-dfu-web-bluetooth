@@ -131,6 +131,8 @@ function parseResponse(response) {
   switch (responseOpCode) {
     case CONTROL_OPCODES.CREATE:
       break;
+    case CONTROL_OPCODES.SET_PRN:
+      break;
     case CONTROL_OPCODES.CALCULATE_CHECKSUM:
       responseSpecificData = {
         offset: response.getUint32(CALCULATE_CHECKSUM_RESPONSE_FIELD.OFFSET),
@@ -157,12 +159,24 @@ function parseResponse(response) {
 }
 
 
+function littleEndian(src) {
+  const buffer = new Buffer(src.length);
+
+  for (let i = 0, j = src.length - 1; i <= j; ++i, --j) {
+    buffer[i] = src[j];
+    buffer[j] = src[i];
+  }
+
+  return buffer;
+}
+
+
 function sendData(characteristic, buffer) {
   return new Promise((resolve, reject) => {
     if (buffer.length <= 0) {
       resolve();
     } else {
-      characteristic.writeValue(buffer.slice(0, BLE_PACKET_SIZE))
+      characteristic.writeValue(littleEndian(buffer.slice(0, BLE_PACKET_SIZE)))
       .then(() => sendData(characteristic, buffer.slice(BLE_PACKET_SIZE)))
       .then(() => {
         resolve();
@@ -187,3 +201,4 @@ exports.deviceDiscover = deviceDiscover;
 exports.enableNotifications = enableNotifications;
 exports.parseResponse = parseResponse;
 exports.sendData = sendData;
+exports.littleEndian = littleEndian;

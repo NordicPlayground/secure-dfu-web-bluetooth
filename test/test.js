@@ -40,6 +40,15 @@ describe('#file_utils', () => {
 describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_ble_s132_pca10040_debug.hex in range of computer.', () => {
   let gatt;
 
+  it('should test littleEndian.', () => {
+    let res = index.littleEndian(new Buffer([0, 1, 2, 3]));
+    expect(res.toString()).to.equal('\u0003\u0002\u0001\u0000');
+    res = index.littleEndian(new Buffer([0]));
+    expect(res.toString()).to.equal('\u0000');
+    res = index.littleEndian(new Buffer([]));
+    expect(res.toString()).to.equal('');
+  });
+
   it('should succesfully scan for, connect to, and discover the services/characteristics of the DFU target device.', (done) => {
     index.deviceDiscover()
     .then((result) => {
@@ -70,8 +79,9 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
     } else if (parsedResponse.responseOpCode === 1) {
       expect(parsedResponse.data).to.equal(undefined);
     } else if (parsedResponse.responseOpCode === 3) {
-      console.log(response);
       console.log(parsedResponse.data);
+    } else if (parsedResponse.responseOpCode === 2) {
+      console.log('prn');
       // expect(parsedResponse.data).to.equal(undefined);
     }
 
@@ -108,20 +118,28 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
     });
   });
 
-  it('should send the init packet.', function (done) { // Note, arrow operator not good with mocha...
+  it('should set the PRN.', (done) => {
     globalDone = done;
+    const writeVal = new Uint8Array([0x02, 0x02, 0x00]);
+    gatt.controlPointCharacteristic.writeValue(writeVal)
+    .catch((error) => {
+      throw error;
+    });
+  });
+
+  it('should send the init packet.', function (done) { // Note, arrow operator not good with mocha...
+    globalDone = () => console.log('dummy');
     this.timeout(5000);
 
     fileUtils.parseBinaryFile(`${__dirname}/../tmp/nrf52832_xxaa.dat`)
     .then(result => index.sendData(gatt.packetCharacteristic, result))
     .then(() => {
       console.log('sent data');
-      const writeVal = new Uint8Array([3]);
+      let writeVal = new Uint8Array([3]);
       return gatt.controlPointCharacteristic.writeValue(writeVal);
     })
     .then((_) => {
       console.log('sent crc calc req');
-      return gatt.controlPointCharacteristic.readValue();
     })
     .catch((error) => {
       throw error;
