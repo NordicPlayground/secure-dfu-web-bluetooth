@@ -1,6 +1,7 @@
 const bluetooth = require('bleat').webbluetooth;
 
 const fileUtils = require('./utils/file_utils');
+const littleEndianUtils = require('./utils/little_endian_utils');
 
 // https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v12.0.0/lib_dfu_transport_ble.html?cp=4_0_0_3_4_3_2
 const BASE_SERVICE_UUID = '0000xxxx-0000-1000-8000-00805f9b34fb';
@@ -145,15 +146,17 @@ function parseResponse(response) {
       break;
     case CONTROL_OPCODES.CALCULATE_CHECKSUM:
       responseSpecificData = {
-        offset: response.getUint32(CALCULATE_CHECKSUM_RESPONSE_FIELD.OFFSET),
-        crc32: response.getUint32(CALCULATE_CHECKSUM_RESPONSE_FIELD.CRC32),
+        offset: littleEndianUtils.littleEndianUInt32(response.getUint32(CALCULATE_CHECKSUM_RESPONSE_FIELD.OFFSET)),
+        crc32: littleEndianUtils.littleEndianUInt32(response.getUint32(CALCULATE_CHECKSUM_RESPONSE_FIELD.CRC32)),
       };
+      break;
+    case CONTROL_OPCODES.EXECUTE:
       break;
     case CONTROL_OPCODES.SELECT:
       responseSpecificData = {
-        maximumSize: response.getUint32(SELECT_RESPONSE_FIELD.MAXIMUM_SIZE),
-        offset: response.getUint32(SELECT_RESPONSE_FIELD.OFFSET),
-        crc32: response.getUint32(SELECT_RESPONSE_FIELD.CRC32),
+        maximumSize: littleEndianUtils.littleEndianUInt32(response.getUint32(SELECT_RESPONSE_FIELD.MAXIMUM_SIZE)),
+        offset: littleEndianUtils.littleEndianUInt32(response.getUint32(SELECT_RESPONSE_FIELD.OFFSET)),
+        crc32: littleEndianUtils.littleEndianUInt32(response.getUint32(SELECT_RESPONSE_FIELD.CRC32)),
       };
       break;
     default:
@@ -168,25 +171,13 @@ function parseResponse(response) {
   };
 }
 
-// Note, this is currently converting converting to little endian and returning a Uint8 Array.
-function littleEndian(src) {
-  const buffer = new Buffer(src.length);
-
-  for (let i = 0, j = src.length - 1; i <= j; ++i, --j) {
-    buffer[i] = src[j];
-    buffer[j] = src[i];
-  }
-
-  return new Uint8Array(buffer);
-}
-
 
 function sendData(characteristic, buffer) {
   return new Promise((resolve, reject) => {
     if (buffer.length <= 0) {
       resolve();
     } else {
-      characteristic.writeValue(littleEndian(buffer.slice(0, BLE_PACKET_SIZE)))
+      characteristic.writeValue(littleEndianUtils.littleEndian(buffer.slice(0, BLE_PACKET_SIZE)))
       .then(() => sendData(characteristic, buffer.slice(BLE_PACKET_SIZE)))
       .then(() => {
         resolve();
@@ -232,6 +223,7 @@ function controlPointNotificationHandler(event) {
       break;
     case CONTROL_OPCODES.CALCULATE_CHECKSUM:
       console.log('CALCULATE_CHECKSUM');
+      // TODO: Check if offset and crc is correct before executing.
       gatt.controlPointCharacteristic.writeValue(new Uint8Array([CONTROL_OPCODES.EXECUTE]))
       .catch((error) => {
         throw error;
@@ -285,4 +277,3 @@ exports.deviceDiscover = deviceDiscover;
 exports.enableNotifications = enableNotifications;
 exports.parseResponse = parseResponse;
 exports.sendData = sendData;
-exports.littleEndian = littleEndian;

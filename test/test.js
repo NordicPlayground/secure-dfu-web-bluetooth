@@ -3,6 +3,7 @@ const fs = require('fs');
 const expect = require('chai').expect;
 
 const fileUtils = require('../utils/file_utils');
+const littleEndianUtils = require('../utils/little_endian_utils');
 const index = require('../index');
 
 
@@ -41,12 +42,23 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
   let gatt;
 
   it('should test littleEndian.', () => {
-    let res = index.littleEndian(new Buffer([0, 1, 2, 3]));
+    let res = littleEndianUtils.littleEndian(new Buffer([0, 1, 2, 3]));
     expect(res.toString()).to.equal('3,2,1,0');
-    res = index.littleEndian(new Buffer([0]));
+    res = littleEndianUtils.littleEndian(new Buffer([0]));
     expect(res.toString()).to.equal('0');
-    res = index.littleEndian(new Buffer([]));
+    res = littleEndianUtils.littleEndian(new Buffer([]));
     expect(res.toString()).to.equal('');
+  });
+
+  it('should test littleEndianUInt32.', () => {
+    let res = littleEndianUtils.littleEndianUInt32(0xff000000);
+    expect(res).to.equal(0x000000ff);
+    res = littleEndianUtils.littleEndianUInt32(0xffffffff);
+    expect(res).to.equal(0xffffffff);
+    res = littleEndianUtils.littleEndianUInt32(0);
+    expect(res).to.equal(0);
+    res = littleEndianUtils.littleEndianUInt32(0x12345678);
+    expect(res).to.equal(0x78563412);
   });
 
   it('should succesfully scan for, connect to, and discover the services/characteristics of the DFU target device.', (done) => {
@@ -73,7 +85,7 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
     const parsedResponse = index.parseResponse(response);
 
     if (parsedResponse.responseOpCode === 6) {
-      expect(parsedResponse.data.maximumSize).to.equal(65536);
+      expect(parsedResponse.data.maximumSize).to.equal(256); // TODO: is this LE?
       expect(parsedResponse.data.offset).to.equal(0);
       expect(parsedResponse.data.crc32).to.equal(0);
     } else if (parsedResponse.responseOpCode === 1) {
@@ -103,7 +115,7 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
   it('should send create command.', (done) => {
     globalDone = done;
     const writeVal = Buffer.from([0x01, 0x01, 0x8A, 0x0, 0x0, 0x0]);
-    index.sendData(gatt.controlPointCharacteristic, index.littleEndian(writeVal))
+    index.sendData(gatt.controlPointCharacteristic, littleEndianUtils.littleEndian(writeVal))
     .catch((error) => {
       throw error;
     });
