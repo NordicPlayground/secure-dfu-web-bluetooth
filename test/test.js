@@ -42,9 +42,9 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
 
   it('should test littleEndian.', () => {
     let res = index.littleEndian(new Buffer([0, 1, 2, 3]));
-    expect(res.toString()).to.equal('\u0003\u0002\u0001\u0000');
+    expect(res.toString()).to.equal('3,2,1,0');
     res = index.littleEndian(new Buffer([0]));
-    expect(res.toString()).to.equal('\u0000');
+    expect(res.toString()).to.equal('0');
     res = index.littleEndian(new Buffer([]));
     expect(res.toString()).to.equal('');
   });
@@ -102,45 +102,8 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
 
   it('should send create command.', (done) => {
     globalDone = done;
-    const writeVal = new Uint8Array([0x01, 0x01, 0x64, 0x0, 0x0, 0x0]);
-    gatt.controlPointCharacteristic.writeValue(writeVal)
-    .catch((error) => {
-      throw error;
-    });
-  });
-
-  it('should write the calculate crc command before sending init packet.', (done) => {
-    globalDone = done;
-    const writeVal = new Uint8Array([0x03]);
-    gatt.controlPointCharacteristic.writeValue(writeVal)
-    .catch((error) => {
-      throw error;
-    });
-  });
-
-  it('should set the PRN.', (done) => {
-    globalDone = done;
-    const writeVal = new Uint8Array([0x02, 0x02, 0x00]);
-    gatt.controlPointCharacteristic.writeValue(writeVal)
-    .catch((error) => {
-      throw error;
-    });
-  });
-
-  it('should send the init packet.', function (done) { // Note, arrow operator not good with mocha...
-    globalDone = () => console.log('dummy');
-    this.timeout(5000);
-
-    fileUtils.parseBinaryFile(`${__dirname}/../tmp/nrf52832_xxaa.dat`)
-    .then(result => index.sendData(gatt.packetCharacteristic, result))
-    .then(() => {
-      console.log('sent data');
-      let writeVal = new Uint8Array([3]);
-      return gatt.controlPointCharacteristic.writeValue(writeVal);
-    })
-    .then((_) => {
-      console.log('sent crc calc req');
-    })
+    const writeVal = Buffer.from([0x01, 0x01, 0x8A, 0x0, 0x0, 0x0]);
+    index.sendData(gatt.controlPointCharacteristic, index.littleEndian(writeVal))
     .catch((error) => {
       throw error;
     });

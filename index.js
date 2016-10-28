@@ -168,7 +168,7 @@ function parseResponse(response) {
   };
 }
 
-
+// Note, this is currently converting converting to little endian and returning a Uint8 Array.
 function littleEndian(src) {
   const buffer = new Buffer(src.length);
 
@@ -177,15 +177,11 @@ function littleEndian(src) {
     buffer[j] = src[i];
   }
 
-  return buffer;
+  return new Uint8Array(buffer);
 }
 
 
 function sendData(characteristic, buffer) {
-  if (characteristic.uuid !== DFU_PACKET_UUID) {
-    throw new Error('Data must be written to the data point characteristic.');
-  }
-
   return new Promise((resolve, reject) => {
     if (buffer.length <= 0) {
       resolve();
@@ -219,7 +215,7 @@ function controlPointNotificationHandler(event) {
     case CONTROL_OPCODES.CREATE:
       console.log('CREATE');
       gatt.controlPointCharacteristic.writeValue(
-        new Uint8Array([CONTROL_OPCODES.SET_PRN, 0x00, 0x00]))
+        new Uint8Array([CONTROL_OPCODES.SET_PRN, 0x00, 0x00])) // TODO:
       .catch((error) => {
         throw error;
       });
@@ -250,7 +246,7 @@ function controlPointNotificationHandler(event) {
       gatt.controlPointCharacteristic.writeValue(
         new Uint8Array([CONTROL_OPCODES.CREATE,
                         CONTROL_PARAMETERS.COMMAND_OBJECT,
-                        0x8a, 0x0, 0x0, 0x0]))
+                        0x8a, 0x0, 0x0, 0x0])) // TODO: Size should not be hard-coded.
       .catch((error) => {
         throw error;
       });
