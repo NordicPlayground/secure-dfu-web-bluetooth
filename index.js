@@ -154,6 +154,15 @@ function controlPointNotificationHandler(event) {
       break;
     case CONTROL_OPCODES.EXECUTE:
       console.log('EXECUTE');
+      gatt.controlPointCharacteristic.removeEventListener('characteristicvaluechanged',
+        controlPointNotificationHandler);
+      gatt.controlPointCharacteristic.addEventListener('characteristicvaluechanged',
+        dataEventListener);
+      gatt.controlPointCharacteristic.writeValue(
+        new Uint8Array([CONTROL_OPCODES.SELECT, CONTROL_PARAMETERS.DATA_OBJECT]))
+      .catch((error) => {
+        throw error;
+      });
       break;
     case CONTROL_OPCODES.SELECT:
       console.log('SELECT');
@@ -162,6 +171,72 @@ function controlPointNotificationHandler(event) {
         new Uint8Array([CONTROL_OPCODES.CREATE,
                         CONTROL_PARAMETERS.COMMAND_OBJECT,
                         0x8a, 0x0, 0x0, 0x0])) // TODO: Size should not be hard-coded.
+      .catch((error) => {
+        throw error;
+      });
+      break;
+    default:
+      throw new Error(`Unknwon response op-code received: ${controlOpCodeToString(responseOpCode)}.`);
+  }
+}
+
+
+let imageBuf;
+
+function dataEventListener(event) {
+  const response = event.target.value;
+  const parsedResponse = parseResponse(response);
+  const responseOpCode = parsedResponse.responseOpCode;
+
+  console.log(parsedResponse);
+
+  switch (responseOpCode) {
+    case CONTROL_OPCODES.CREATE:
+      console.log('CREATE');
+      dfuBLEUtils.sendData(gatt.packetCharacteristic, imageBuf.slice(0, 0x1000))
+      .then(() => gatt.controlPointCharacteristic.writeValue(
+          new Uint8Array([CONTROL_OPCODES.CALCULATE_CHECKSUM])))
+      .catch((error) => {
+        throw error;
+      });
+      break;
+    case CONTROL_OPCODES.SET_PRN:
+      console.log('SET_PRN');
+      break;
+    case CONTROL_OPCODES.CALCULATE_CHECKSUM:
+      console.log('CALCULATE_CHECKSUM');
+      expectedCRC = crc.crc32(imageBuf.slice(0, 0x1000));
+      console.log(expectedCRC);
+      imageBuf = imageBuf.slice(0x1000);
+      if (imageBuf.length !== 0) {
+        dfuBLEUtils.sendData(gatt.packetCharacteristic, imageBuf.slice(0, 0x1000))
+        .then(() => gatt.controlPointCharacteristic.writeValue(
+          new Uint8Array([CONTROL_OPCODES.CALCULATE_CHECKSUM])))
+        .catch((error) => {
+          throw error;
+        });
+      } else {
+        gatt.controlPointCharacteristic.writeValue(new Uint8Array([CONTROL_OPCODES.EXECUTE]))
+        .catch((error) => {
+          throw error;
+        });
+      }
+      break;
+    case CONTROL_OPCODES.EXECUTE:
+      console.log('EXECUTE');
+      break;
+    case CONTROL_OPCODES.SELECT:
+      console.log('SELECT');
+      fileUtils.parseBinaryFile(`${__dirname}/tmp/nrf52832_xxaa.bin`)
+      .then((result) => {
+        imageBuf = result;
+        console.log(imageBuf.length);
+        return gatt.controlPointCharacteristic.writeValue(
+          new Uint8Array([CONTROL_OPCODES.CREATE,
+            CONTROL_PARAMETERS.DATA_OBJECT,
+            0x0, 0x10, 0x0, 0x0])); // TODO: Size should not be hard-coded.
+      })
+
       .catch((error) => {
         throw error;
       });
