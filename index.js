@@ -1,4 +1,5 @@
 const bluetooth = require('bleat').webbluetooth;
+const crc = require('crc');
 
 const fileUtils = require('./utils/file_utils');
 const littleEndianUtils = require('./utils/little_endian_utils');
@@ -177,6 +178,7 @@ function sendData(characteristic, buffer) {
     if (buffer.length <= 0) {
       resolve();
     } else {
+      // HACK: Needed side effect here, littleEndian is converting buffer to UInt8 Array...
       characteristic.writeValue(littleEndianUtils.littleEndian(buffer.slice(0, BLE_PACKET_SIZE)))
       .then(() => sendData(characteristic, buffer.slice(BLE_PACKET_SIZE)))
       .then(() => {
@@ -193,6 +195,7 @@ function sendData(characteristic, buffer) {
 /* Use the functions above to do the DFU. */
 
 let gatt;
+let expectedCRC;
 
 
 function controlPointNotificationHandler(event) {
@@ -214,7 +217,11 @@ function controlPointNotificationHandler(event) {
     case CONTROL_OPCODES.SET_PRN:
       console.log('SET_PRN');
       fileUtils.parseBinaryFile(`${__dirname}/tmp/nrf52832_xxaa.dat`)
-      .then(result => sendData(gatt.packetCharacteristic, result))
+      .then((result) => {
+        expectedCRC = crc.crc32(result);
+        console.log(expectedCRC);
+        return sendData(gatt.packetCharacteristic, result);
+      })
       .then(() => gatt.controlPointCharacteristic.writeValue(
           new Uint8Array([CONTROL_OPCODES.CALCULATE_CHECKSUM])))
       .catch((error) => {

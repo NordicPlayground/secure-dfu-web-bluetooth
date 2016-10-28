@@ -115,7 +115,8 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
   it('should send create command.', (done) => {
     globalDone = done;
     const writeVal = Buffer.from([0x01, 0x01, 0x8A, 0x0, 0x0, 0x0]);
-    index.sendData(gatt.controlPointCharacteristic, littleEndianUtils.littleEndian(writeVal))
+    // See BUG comment in little_endian_utils.js.
+    index.sendData(gatt.controlPointCharacteristic, writeVal)
     .catch((error) => {
       throw error;
     });
