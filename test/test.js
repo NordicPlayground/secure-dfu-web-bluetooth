@@ -2,6 +2,7 @@ const fs = require('fs');
 
 const expect = require('chai').expect;
 
+const dfuBLEUtils = require('../utils/web_bluetooth_utils');
 const fileUtils = require('../utils/file_utils');
 const littleEndianUtils = require('../utils/little_endian_utils');
 const index = require('../index');
@@ -62,13 +63,13 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
   });
 
   it('should succesfully scan for, connect to, and discover the services/characteristics of the DFU target device.', (done) => {
-    index.deviceDiscover()
+    dfuBLEUtils.deviceDiscover()
     .then((result) => {
       expect(result.device.name).to.equal('DfuTarg');
       expect(result.server.connected).to.equal(true);
-      expect(result.service.uuid).to.equal(index.SECURE_DFU_SERVICE_UUID);
-      expect(result.controlPointCharacteristic.uuid).to.equal(index.DFU_CONTROL_POINT_UUID);
-      expect(result.packetCharacteristic.uuid).to.equal(index.DFU_PACKET_UUID);
+      expect(result.service.uuid).to.equal(dfuBLEUtils.SECURE_DFU_SERVICE_UUID);
+      expect(result.controlPointCharacteristic.uuid).to.equal(dfuBLEUtils.DFU_CONTROL_POINT_UUID);
+      expect(result.packetCharacteristic.uuid).to.equal(dfuBLEUtils.DFU_PACKET_UUID);
       gatt = result;
       done();
     })
@@ -102,7 +103,7 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
 
   it('should succesfully enable notifications on the control point characteristic.', (done) => {
     globalDone = done;
-    index.enableNotifications(gatt.controlPointCharacteristic, notificationHandler)
+    dfuBLEUtils.enableNotifications(gatt.controlPointCharacteristic, notificationHandler)
     .then(() => {
       const writeVal = new Uint8Array([0x06, 0x01]);
       return gatt.controlPointCharacteristic.writeValue(writeVal);
@@ -116,7 +117,7 @@ describe('#index -- NOTE: requires nRF52 device running secure_dfu_secure_dfu_bl
     globalDone = done;
     const writeVal = Buffer.from([0x01, 0x01, 0x8A, 0x0, 0x0, 0x0]);
     // See BUG comment in little_endian_utils.js.
-    index.sendData(gatt.controlPointCharacteristic, writeVal)
+    dfuBLEUtils.sendData(gatt.controlPointCharacteristic, writeVal)
     .catch((error) => {
       throw error;
     });

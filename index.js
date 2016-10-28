@@ -1,18 +1,9 @@
-const bluetooth = require('bleat').webbluetooth;
 const crc = require('crc');
 
+const dfuBLEUtils = require('./utils/web_bluetooth_utils');
 const fileUtils = require('./utils/file_utils');
 const littleEndianUtils = require('./utils/little_endian_utils');
 
-// https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v12.0.0/lib_dfu_transport_ble.html?cp=4_0_0_3_4_3_2
-const BASE_SERVICE_UUID = '0000xxxx-0000-1000-8000-00805f9b34fb';
-const SECURE_DFU_SERVICE_UUID = BASE_SERVICE_UUID.replace('xxxx', 'fe59');
-
-const BASE_CHARACTERISTIC_UUID = '8ec9xxxx-f315-4f60-9fb8-838830daea50';
-const DFU_CONTROL_POINT_UUID = BASE_CHARACTERISTIC_UUID.replace('xxxx', '0001');
-const DFU_PACKET_UUID = BASE_CHARACTERISTIC_UUID.replace('xxxx', '0002');
-
-const BLE_PACKET_SIZE = 20;
 
 // Control point procedure opcodes.
 const CONTROL_OPCODES = {
@@ -71,60 +62,6 @@ const controlOpCodeToString = reverseLookup(CONTROL_OPCODES);
 const resultCodeToString = reverseLookup(RESULT_CODES);
 
 
-function deviceDiscover() {
-  let globalDevice;
-  let globalServer;
-  let dfuService;
-  let controlPointChar;
-
-  return new Promise((resolve, reject) => {
-    bluetooth.requestDevice({ filters: [{ services: [SECURE_DFU_SERVICE_UUID] }] })
-    .then((device) => {
-      globalDevice = device;
-      return device.gatt.connect();
-    })
-    .then((server) => {
-      globalServer = server;
-      return server.getPrimaryService(SECURE_DFU_SERVICE_UUID);
-    })
-    .then((service) => {
-      dfuService = service;
-      return service.getCharacteristic(DFU_CONTROL_POINT_UUID);
-    })
-    .then((characteristic) => {
-      controlPointChar = characteristic;
-      return dfuService.getCharacteristic(DFU_PACKET_UUID);
-    })
-    .then((characteristic) => {
-      resolve({
-        device: globalDevice,
-        server: globalServer,
-        service: dfuService,
-        controlPointCharacteristic: controlPointChar,
-        packetCharacteristic: characteristic,
-      });
-    })
-    .catch((error) => {
-      reject(error);
-    });
-  });
-}
-
-
-function enableNotifications(controlPointCharacteristic, eventListener) {
-  return new Promise((resolve, reject) => {
-    controlPointCharacteristic.startNotifications()
-    .then(() => {
-      controlPointCharacteristic.addEventListener('characteristicvaluechanged', eventListener);
-      resolve();
-    })
-    .catch((error) => {
-      reject(error);
-    });
-  });
-}
-
-
 function parseResponse(response) {
   const responseCode = response.getUint8(0);
   const responseOpCode = response.getUint8(1);
@@ -173,27 +110,6 @@ function parseResponse(response) {
 }
 
 
-function sendData(characteristic, buffer) {
-  return new Promise((resolve, reject) => {
-    if (buffer.length <= 0) {
-      resolve();
-    } else {
-      // HACK: Needed side effect here, littleEndian is converting buffer to UInt8 Array...
-      characteristic.writeValue(littleEndianUtils.littleEndian(buffer.slice(0, BLE_PACKET_SIZE)))
-      .then(() => sendData(characteristic, buffer.slice(BLE_PACKET_SIZE)))
-      .then(() => {
-        resolve();
-      })
-      .catch((error) => {
-        reject(error);
-      });
-    }
-  });
-}
-
-
-/* Use the functions above to do the DFU. */
-
 let gatt;
 let expectedCRC;
 
@@ -220,7 +136,7 @@ function controlPointNotificationHandler(event) {
       .then((result) => {
         expectedCRC = crc.crc32(result);
         console.log(expectedCRC);
-        return sendData(gatt.packetCharacteristic, result);
+        return dfuBLEUtils.sendData(gatt.packetCharacteristic, result);
       })
       .then(() => gatt.controlPointCharacteristic.writeValue(
           new Uint8Array([CONTROL_OPCODES.CALCULATE_CHECKSUM])))
@@ -257,10 +173,10 @@ function controlPointNotificationHandler(event) {
 
 
 function doDFU() {
-  deviceDiscover()
+  dfuBLEUtils.deviceDiscover()
   .then((result) => {
     gatt = result;
-    return enableNotifications(gatt.controlPointCharacteristic, controlPointNotificationHandler);
+    return dfuBLEUtils.enableNotifications(gatt.controlPointCharacteristic, controlPointNotificationHandler);
   })
   .then(() => gatt.controlPointCharacteristic.writeValue(
     new Uint8Array([CONTROL_OPCODES.SELECT, CONTROL_PARAMETERS.COMMAND_OBJECT])))
@@ -273,14 +189,7 @@ function doDFU() {
 doDFU();
 
 // Export global variables for testing.
-exports.SECURE_DFU_SERVICE_UUID = SECURE_DFU_SERVICE_UUID;
-exports.DFU_CONTROL_POINT_UUID = DFU_CONTROL_POINT_UUID;
-exports.DFU_PACKET_UUID = DFU_PACKET_UUID;
-
 exports.CONTROL_OPCODES = CONTROL_OPCODES;
 
 // Export functions for testing.
-exports.deviceDiscover = deviceDiscover;
-exports.enableNotifications = enableNotifications;
 exports.parseResponse = parseResponse;
-exports.sendData = sendData;
