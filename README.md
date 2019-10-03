@@ -1,6 +1,8 @@
 secure-dfu
 =========
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/NordicPlayground/secure-dfu-web-bluetooth.svg)](https://greenkeeper.io/)
+
 Library for performing secure device firmware updates over-the-air via Web Bluetooth.
 
 ## Installation
